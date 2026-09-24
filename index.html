@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HSK Pinyin Inspector - Mandarin Character & HSK Analyzer</title>
+  <meta name="description" content="An interactive HTML5 Single Page Application to paste Mandarin characters, view Pinyin, and inspect official HSK 3.0 & 2.0 levels via kuibinlin/hsk-mcp-server.">
+  <link rel="stylesheet" href="styles.css">
+  <!-- Bundled HSK 3.0 & 2.0 baseline dataset extracted directly from MCP server -->
+  <script src="hsk_data.js"></script>
+  <!-- Core application logic and MCP client -->
+  <script src="app.js" defer></script>
+</head>
+<body>
+
+  <!-- Top Navigation Bar -->
+  <header class="app-header">
+    <div class="nav-container">
+      <div class="brand-wrapper">
+        <div class="brand-icon">拼</div>
+        <div class="brand-title-group">
+          <h1>HSK Pinyin Inspector <span style="font-size: 0.85rem; font-weight: 500; color: var(--accent-primary);">v1.0</span></h1>
+          <div class="brand-subtitle">Mandarin Characters & HSK 3.0 / 2.0 Analyzer powered by <a href="https://github.com/kuibinlin/hsk-mcp-server" target="_blank" style="color: inherit; text-decoration: underline;">hsk-mcp-server</a></div>
+        </div>
+      </div>
+
+      <div class="nav-actions">
+        <!-- Live MCP Status Badge -->
+        <div class="mcp-status-badge" id="btn-open-settings" title="Click to configure MCP server connection">
+          <span class="status-dot connecting" id="mcp-status-dot"></span>
+          <span id="mcp-status-text">Connecting to MCP...</span>
+        </div>
+
+        <!-- Dark / Light Mode Toggle -->
+        <button class="btn-icon" id="btn-theme-toggle" title="Toggle Dark/Light Mode">🌙</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Layout -->
+  <main class="main-content">
+
+    <!-- Input Section Card -->
+    <section class="input-card">
+      <div class="input-header">
+        <div style="font-weight: 600; font-size: 0.95rem;">Mandarin Input Text</div>
+        <!-- Sample Presets -->
+        <div class="presets-container">
+          <span style="font-size: 0.75rem; color: var(--text-secondary); margin-right: 0.25rem;">Samples:</span>
+          <button class="preset-chip" data-preset="beginner">HSK 1-2 Beginner</button>
+          <button class="preset-chip" data-preset="intermediate">HSK 3-4 Intermediate</button>
+          <button class="preset-chip" data-preset="advanced">HSK 5-6 Advanced</button>
+          <button class="preset-chip" data-preset="master">HSK 7 Master</button>
+          <button class="preset-chip" data-preset="idioms">Idioms (成语)</button>
+          <button class="preset-chip" data-preset="polyphones">Polyphones (多音字)</button>
+        </div>
+      </div>
+
+      <!-- Textarea for pasting Mandarin characters -->
+      <div class="textarea-wrapper">
+        <textarea
+          id="chinese-input"
+          class="chinese-input-area"
+          placeholder="Paste or type any Mandarin Chinese characters, words, sentences, or paragraphs here..."
+          rows="4"
+        ></textarea>
+      </div>
+
+      <!-- Action Toolbar -->
+      <div class="input-footer">
+        <div class="action-buttons-group">
+          <button class="btn btn-primary" id="btn-analyze">✨ Analyze Text</button>
+          <button class="btn btn-outline" id="btn-paste">📋 Paste Clipboard</button>
+          <button class="btn btn-outline" id="btn-clear">🗑️ Clear</button>
+          <button class="btn btn-outline" id="btn-speak-all" title="Read whole text with Web Speech synthesis">🔊 Listen All</button>
+        </div>
+        <div class="stats-counter">
+          <span id="input-char-count">0 characters</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Controls & View Filters Toolbar -->
+    <section class="controls-bar">
+      <!-- Standard Toggle: HSK 3.0 vs HSK 2.0 -->
+      <div class="control-group">
+        <span class="control-label">Standard:</span>
+        <div class="toggle-switch-group">
+          <button class="toggle-option active" data-standard="new">HSK 3.0 (Levels 1-7)</button>
+          <button class="toggle-option" data-standard="old">HSK 2.0 (Levels 1-6)</button>
+        </div>
+      </div>
+
+      <!-- Display Toggles -->
+      <div class="control-group">
+        <span class="control-label">Annotations:</span>
+        <button class="btn btn-sm btn-outline active" id="toggle-pinyin" title="Show/Hide Pinyin">Pinyin</button>
+        <button class="btn btn-sm btn-outline active" id="toggle-badges" title="Show/Hide HSK Level Badges">HSK Badges</button>
+        <button class="btn btn-sm btn-outline active" id="toggle-tone-colors" title="Toggle Pleco Tone Color Accents">Tone Colors</button>
+      </div>
+
+      <!-- Phonetic Script Mode -->
+      <div class="control-group">
+        <span class="control-label">Script:</span>
+        <div class="toggle-switch-group">
+          <button class="toggle-option active" data-script="pinyin">Pinyin Marks</button>
+          <button class="toggle-option" data-script="numeric">Tone Numbers</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Analytics & Difficulty Summary Banner -->
+    <section class="analytics-banner">
+      <div class="analytics-metrics-row">
+        <div class="metric-card">
+          <span class="metric-val" id="metric-total-chars">0</span>
+          <span class="metric-lbl">Total Hanzi</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-val" id="metric-unique-chars">0</span>
+          <span class="metric-lbl">Unique Chars</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-val" id="metric-total-words">0</span>
+          <span class="metric-lbl">HSK Words</span>
+        </div>
+      </div>
+
+      <!-- HSK Distribution Bar -->
+      <div class="hsk-distribution-bar-wrapper">
+        <div class="hsk-distribution-bar" id="hsk-distribution-bar">
+          <div class="hsk-bar-segment" style="width: 100%; background-color: var(--border-subtle);"></div>
+        </div>
+        <div class="hsk-legend-row">
+          <div class="hsk-legend-item"><span class="legend-color-dot bg-hsk-1"></span> HSK 1</div>
+          <div class="hsk-legend-item"><span class="legend-color-dot bg-hsk-2"></span> HSK 2</div>
+          <div class="hsk-legend-item"><span class="legend-color-dot bg-hsk-3"></span> HSK 3</div>
+          <div class="hsk-legend-item"><span class="legend-color-dot bg-hsk-4"></span> HSK 4</div>
+          <div class="hsk-legend-item"><span class="legend-color-dot bg-hsk-5"></span> HSK 5</div>
+          <div class="hsk-legend-item"><span class="legend-color-dot bg-hsk-6"></span> HSK 6</div>
+          <div class="hsk-legend-item"><span class="legend-color-dot bg-hsk-7"></span> HSK 7</div>
+          <div class="hsk-legend-item"><span class="legend-color-dot bg-hsk-none"></span> Non-HSK</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- View Mode Tabs Navigation -->
+    <nav class="tabs-navigation">
+      <button class="tab-btn active" data-tab="ruby-view">📖 Annotated Text (Ruby)</button>
+      <button class="tab-btn" data-tab="cards-view">🀄 Character Cards Grid</button>
+      <button class="tab-btn" data-tab="vocab-view">📋 Vocabulary Table</button>
+      <button class="tab-btn" data-tab="analytics-view">📊 Level Analytics</button>
+      <button class="tab-btn" data-tab="mcp-view">⚡ Live MCP Server Explorer</button>
+    </nav>
+
+    <!-- Tab 1: Ruby Annotated Text View -->
+    <div class="tab-pane active" id="ruby-view">
+      <!-- Ruby Audio & View Toolbar -->
+      <div class="ruby-toolbar">
+        <div class="ruby-toolbar-left">
+          <button class="btn btn-sm btn-primary" id="btn-ruby-play" title="Play full text with synchronized word highlighting">
+            <span id="ruby-play-icon">▶️</span> <span id="ruby-play-text">Play Text</span>
+          </button>
+          <button class="btn btn-sm btn-outline" id="btn-ruby-pause" style="display: none;" title="Pause playback">
+            ⏸️ Pause
+          </button>
+          <button class="btn btn-sm btn-outline" id="btn-ruby-stop" style="display: none;" title="Stop playback">
+            ⏹️ Stop
+          </button>
+
+          <div class="control-group" style="margin-left: 0.5rem;">
+            <label style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 600;">Speed:</label>
+            <select id="ruby-speed-select" style="padding: 0.3rem 0.5rem; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background-color: var(--bg-surface); color: var(--text-main); font-size: 0.8rem;">
+              <option value="0.6">0.6x (Slow)</option>
+              <option value="0.8" selected>0.8x (Study)</option>
+              <option value="1.0">1.0x (Normal)</option>
+              <option value="1.2">1.2x (Fast)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="ruby-toolbar-right">
+          <span class="ruby-play-status" id="ruby-play-status">💡 Hover any word to play its audio</span>
+          <div class="ruby-zoom-controls">
+            <button class="btn-icon btn-sm" id="btn-font-decrease" title="Decrease Chinese character size">A-</button>
+            <button class="btn-icon btn-sm" id="btn-font-increase" title="Increase Chinese character size">A+</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="ruby-view-container" id="ruby-text-container">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+
+    <!-- Tab 2: Character Cards Grid -->
+    <div class="tab-pane" id="cards-view">
+      <div class="cards-view-toolbar">
+        <div class="control-group">
+          <label style="font-size: 0.85rem; color: var(--text-secondary);">Filter HSK Level:</label>
+          <select id="card-level-filter" style="padding: 0.4rem 0.6rem; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background-color: var(--bg-surface); color: var(--text-main);">
+            <option value="all">All Levels</option>
+            <option value="1">Level 1</option>
+            <option value="2">Level 2</option>
+            <option value="3">Level 3</option>
+            <option value="4">Level 4</option>
+            <option value="5">Level 5</option>
+            <option value="6">Level 6</option>
+            <option value="7">Level 7</option>
+            <option value="non-hsk">Non-HSK</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label style="font-size: 0.85rem; color: var(--text-secondary);">Sort By:</label>
+          <select id="card-sort-by" style="padding: 0.4rem 0.6rem; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background-color: var(--bg-surface); color: var(--text-main);">
+            <option value="order">Appearance Order</option>
+            <option value="frequency">Most Frequent in Text</option>
+            <option value="level-asc">HSK Level (Lowest First)</option>
+            <option value="level-desc">HSK Level (Highest First)</option>
+            <option value="pinyin">Pinyin (A-Z)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="cards-grid" id="cards-grid-container">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+
+    <!-- Tab 3: Vocabulary Table View -->
+    <div class="tab-pane" id="vocab-view">
+      <div class="cards-view-toolbar">
+        <div class="control-group">
+          <label style="font-size: 0.85rem; color: var(--text-secondary);">Filter Level:</label>
+          <select id="vocab-level-filter" style="padding: 0.4rem 0.6rem; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background-color: var(--bg-surface); color: var(--text-main);">
+            <option value="all">All Words</option>
+            <option value="1">HSK 1</option>
+            <option value="2">HSK 2</option>
+            <option value="3">HSK 3</option>
+            <option value="4">HSK 4</option>
+            <option value="5">HSK 5</option>
+            <option value="6">HSK 6</option>
+            <option value="7">HSK 7</option>
+          </select>
+        </div>
+
+        <div class="action-buttons-group">
+          <button class="btn btn-sm btn-outline" id="btn-export-csv">📥 Export CSV</button>
+          <button class="btn btn-sm btn-outline" id="btn-export-anki">📇 Export Anki Deck</button>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table class="vocab-table">
+          <thead>
+            <tr>
+              <th>Word</th>
+              <th>Pinyin</th>
+              <th>HSK 3.0</th>
+              <th>HSK 2.0</th>
+              <th>English Meaning</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="vocab-table-body">
+            <!-- Rendered dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab 4: Analytics Dashboard View -->
+    <div class="tab-pane" id="analytics-view">
+      <div id="analytics-content-container">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+
+    <!-- Tab 5: Live MCP Server Explorer View -->
+    <div class="tab-pane" id="mcp-view">
+      <div class="mcp-console-container">
+        <!-- Left Column: Tool Playground -->
+        <div class="mcp-panel">
+          <div style="font-weight: 700; font-size: 1.05rem;">MCP Tool Playground</div>
+          <p style="font-size: 0.8rem; color: var(--text-secondary);">Directly invoke the 13 tools exposed by the remote HSK MCP Server over Streamable HTTP.</p>
+
+          <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.5rem;">
+            <div>
+              <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase;">Select Tool:</label>
+              <select id="mcp-test-tool-select" style="width: 100%; margin-top: 0.25rem; padding: 0.5rem; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background-color: var(--bg-surface); color: var(--text-main);">
+                <option value="hsk_lookup">hsk_lookup (Detailed lookup by character/word/pinyin)</option>
+                <option value="hsk_frequency">hsk_frequency (Frequency rank & rarity class)</option>
+                <option value="hsk_convert_script">hsk_convert_script (All 5 phonetic systems)</option>
+                <option value="hsk_classifier">hsk_classifier (Find measure words for nouns)</option>
+                <option value="hsk_search_meaning">hsk_search_meaning (Full-text search in English)</option>
+                <option value="hsk_words_by_radical">hsk_words_by_radical (Words sharing radical)</option>
+                <option value="hsk_homophones">hsk_homophones (Words sharing pronunciation)</option>
+                <option value="hsk_build_study_set">hsk_build_study_set (Build level study list)</option>
+              </select>
+            </div>
+
+            <div>
+              <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase;">Argument (word / query / radical / level):</label>
+              <input type="text" id="mcp-test-arg" value="好" style="width: 100%; margin-top: 0.25rem; padding: 0.5rem; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background-color: var(--bg-primary); color: var(--text-main);">
+            </div>
+
+            <button class="btn btn-primary" id="btn-run-mcp-tool">🚀 Send JSON-RPC Tool Call</button>
+          </div>
+
+          <div style="font-weight: 600; font-size: 0.85rem; margin-top: 0.5rem;">JSON-RPC Response Payload:</div>
+          <div class="code-output-block" id="mcp-tool-result-box">Click "Send JSON-RPC Tool Call" above to test.</div>
+        </div>
+
+        <!-- Right Column: Live Network Activity Log -->
+        <div class="mcp-panel">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-weight: 700; font-size: 1.05rem;">Live MCP JSON-RPC Traffic Log</div>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">Real-time stream</span>
+          </div>
+          <p style="font-size: 0.8rem; color: var(--text-secondary);">Monitors all JSON-RPC requests & SSE responses sent to <code style="font-family: var(--font-mono);">https://hsk-mcp.linsnotes.com/mcp</code>.</p>
+          <div class="code-output-block" id="mcp-logs-container" style="max-height: 520px; background-color: var(--bg-surface-elevated);">
+            <!-- Activity log items rendered here -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Interactive Character & Word Inspector Modal -->
+  <div class="modal-backdrop" id="inspector-modal" onclick="if(event.target === this) closeModal('inspector-modal')">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div style="font-weight: 700; font-size: 1.1rem;">Character & Word Inspector</div>
+        <button class="btn-icon" onclick="closeModal('inspector-modal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <!-- Hero section -->
+        <div class="inspector-hero">
+          <div class="inspector-char" id="modal-char-title">好</div>
+          <div class="inspector-meta">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span style="font-size: 1.4rem; font-weight: 700; color: var(--accent-primary);" id="modal-char-pinyin">hǎo</span>
+              <span style="font-size: 1rem; color: var(--text-muted);" id="modal-char-traditional"></span>
+              <button class="btn-icon btn-sm" id="modal-btn-speak" title="Listen Audio">🔊</button>
+            </div>
+            <div id="modal-meta-levels" style="display: flex; gap: 0.4rem; margin-top: 0.2rem;"></div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);" id="modal-meta-stats"></div>
+          </div>
+        </div>
+
+        <!-- Meaning Section -->
+        <div>
+          <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">English Meanings</div>
+          <div id="modal-char-meaning" style="font-size: 0.95rem; margin-top: 0.25rem; line-height: 1.5;"></div>
+        </div>
+
+        <!-- Transcription Systems -->
+        <div>
+          <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.5rem;">All 5 Phonetic Transcription Systems</div>
+          <div class="transcriptions-grid">
+            <div class="transcription-card">
+              <div class="label">Hanyu Pinyin</div>
+              <div class="value" id="trans-pinyin">—</div>
+            </div>
+            <div class="transcription-card">
+              <div class="label">Numeric Pinyin</div>
+              <div class="value" id="trans-numeric">—</div>
+            </div>
+            <div class="transcription-card">
+              <div class="label">Bopomofo (Zhuyin)</div>
+              <div class="value" id="trans-bopomofo">—</div>
+            </div>
+            <div class="transcription-card">
+              <div class="label">Wade-Giles</div>
+              <div class="value" id="trans-wadegiles">—</div>
+            </div>
+            <div class="transcription-card">
+              <div class="label">Gwoyeu Romatzyh</div>
+              <div class="value" id="trans-romatzyh">—</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Classifiers Section -->
+        <div>
+          <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">Classifiers / Measure Words (量词)</div>
+          <div id="modal-classifiers" style="font-size: 0.9rem; margin-top: 0.2rem; color: var(--text-main);">None listed</div>
+        </div>
+
+        <!-- Raw MCP Server Response Accordion -->
+        <details style="margin-top: 0.5rem; background-color: var(--bg-surface-elevated); border-radius: var(--radius-md); padding: 0.75rem;">
+          <summary style="font-size: 0.8rem; font-weight: 600; cursor: pointer; color: var(--text-secondary);">View Raw JSON from HSK MCP Server</summary>
+          <div class="code-output-block" id="modal-raw-json" style="margin-top: 0.5rem; max-height: 250px;"></div>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-backdrop" id="settings-modal" onclick="if(event.target === this) closeModal('settings-modal')">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div style="font-weight: 700; font-size: 1.1rem;">Configuration & MCP Connection</div>
+        <button class="btn-icon" onclick="closeModal('settings-modal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div>
+          <label style="font-size: 0.85rem; font-weight: 600;">Remote HSK MCP Server Endpoint URL:</label>
+          <input type="text" id="setting-endpoint-url" value="https://hsk-mcp.linsnotes.com/mcp" style="width: 100%; margin-top: 0.4rem; padding: 0.6rem; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background-color: var(--bg-primary); color: var(--text-main); font-family: var(--font-mono); font-size: 0.85rem;">
+          <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.35rem;">Default public endpoint: <code style="font-family: var(--font-mono);">https://hsk-mcp.linsnotes.com/mcp</code>. Free, public, no authentication required.</p>
+        </div>
+
+        <div>
+          <label style="font-size: 0.85rem; font-weight: 600;">Text-to-Speech Voice (Chinese):</label>
+          <select id="setting-tts-voice" style="width: 100%; margin-top: 0.4rem; padding: 0.6rem; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background-color: var(--bg-surface); color: var(--text-main);">
+            <option value="">System Default Chinese Voice</option>
+          </select>
+        </div>
+
+        <div style="background-color: var(--bg-surface-elevated); padding: 0.75rem; border-radius: var(--radius-md); font-size: 0.8rem; color: var(--text-secondary);">
+          <div><strong>Protocol:</strong> Model Context Protocol (MCP) Streamable HTTP</div>
+          <div><strong>Tools:</strong> 13 tutor-oriented tools</div>
+          <div><strong>Dataset Coverage:</strong> 11,470 headwords, 12,623 pronunciation forms</div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.5rem;">
+          <button class="btn btn-outline" onclick="closeModal('settings-modal')">Cancel</button>
+          <button class="btn btn-primary" id="btn-save-settings">Save & Reconnect</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="app-footer">
+    <div>HSK Pinyin Inspector • Powered by <a href="https://github.com/kuibinlin/hsk-mcp-server" target="_blank">kuibinlin/hsk-mcp-server</a> • 11,470 HSK 3.0 & 2.0 Headwords</div>
+  </footer>
+
+</body>
+</html>

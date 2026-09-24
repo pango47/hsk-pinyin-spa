@@ -1,0 +1,21 @@
+# Dependencies & build outputs
+node_modules/
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS metadata
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Editor directories
+.vscode/
+.idea/
+
+# Environment / local secrets (none used here, but good practice)
+.env
+.env.local
+*.local
