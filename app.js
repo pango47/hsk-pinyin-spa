@@ -689,6 +689,10 @@ function renderRubyView() {
     block.setAttribute('data-token-idx', tokIdx);
     block.title = tok.meaning ? `${tok.text} [${tok.pinyin}]: ${tok.meaning}` : tok.text;
     block.onclick = () => openInspector(tok.text, tok);
+    block.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      SpeechController.speakWord(tok.text, block);
+    });
 
     // Floating Hover Play Button directly above word
     const hoverPlayBtn = document.createElement('button');
@@ -696,7 +700,7 @@ function renderRubyView() {
     hoverPlayBtn.title = `Listen to "${tok.text}"`;
     hoverPlayBtn.setAttribute('aria-label', `Play pronunciation for ${tok.text}`);
     hoverPlayBtn.innerHTML = `
-      <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor">
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
         <polygon points="6 4 20 12 6 20 6 4"/>
       </svg>
     `;
