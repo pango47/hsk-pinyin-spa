@@ -334,7 +334,7 @@ class ChineseTextAnalyzer {
   extractUniqueWords(tokens) {
     const wordMap = new Map();
     tokens.forEach(tok => {
-      if (tok.type === 'word' || (tok.type === 'char' && tok.isHeadword)) {
+      if (tok.type === 'word' || tok.type === 'char') {
         if (!wordMap.has(tok.text)) {
           wordMap.set(tok.text, {
             ...tok,
@@ -628,7 +628,8 @@ const state = {
   charFilterLevel: 'all',
   charSortBy: 'order',
   vocabFilterLevel: 'all',
-  rubyFontSize: 1.8
+  rubyFontSize: 1.8,
+  distributionBasis: 'word' // 'word' or 'char'
 };
 
 function updateRubyFontSize() {
@@ -857,10 +858,18 @@ function renderVocabTableView() {
       <td>${oldLvl}</td>
       <td><span style="color: var(--text-secondary);">${w.meaning || '—'}</span></td>
       <td>
-        <button class="btn btn-sm btn-outline" onclick="event.stopPropagation(); SpeechController.speak('${w.text}')">🔊 Play</button>
-        <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); openInspector('${w.text}', null)">Inspect</button>
+        <button class="btn btn-sm btn-outline btn-play-vocab">🔊 Play</button>
+        <button class="btn btn-sm btn-primary btn-inspect-vocab">Inspect</button>
       </td>
     `;
+    tr.querySelector('.btn-play-vocab').onclick = (e) => {
+      e.stopPropagation();
+      SpeechController.speak(w.text);
+    };
+    tr.querySelector('.btn-inspect-vocab').onclick = (e) => {
+      e.stopPropagation();
+      openInspector(w.text, w);
+    };
     tbody.appendChild(tr);
   });
 }
@@ -874,30 +883,42 @@ function renderAnalyticsView() {
   const uniqueCount = state.uniqueChars.length;
   const wordCount = state.uniqueWords.length;
 
-  // Level counts
+  const targetItems = state.distributionBasis === 'word' ? state.uniqueWords : state.uniqueChars;
+  const activeTotal = targetItems.length;
+  const activeLabel = state.distributionBasis === 'word' ? 'words' : 'chars';
+
+  // Level counts for active basis
   const levelCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 0: 0 };
-  state.uniqueChars.forEach(c => {
-    const lvl = state.hskStandard === 'new' ? (c.newLevel || 0) : (c.oldLevel || 0);
+  targetItems.forEach(item => {
+    const lvl = state.hskStandard === 'new' ? (item.newLevel || 0) : (item.oldLevel || 0);
     levelCounts[lvl] = (levelCounts[lvl] || 0) + 1;
   });
 
-  const hskCharsCount = uniqueCount - (levelCounts[0] || 0);
-  const coveragePercent = uniqueCount > 0 ? Math.round((hskCharsCount / uniqueCount) * 100) : 0;
+  const hskItemsCount = activeTotal - (levelCounts[0] || 0);
+  const coveragePercent = activeTotal > 0 ? Math.round((hskItemsCount / activeTotal) * 100) : 0;
 
   // Render HTML
   container.innerHTML = `
     <div class="analytics-grid">
       <div class="analytics-card">
-        <h3>HSK Level Distribution (${state.hskStandard === 'new' ? 'HSK 3.0' : 'HSK 2.0'})</h3>
-        <p style="font-size: 0.8rem; color: var(--text-secondary);">Breakdown of unique characters in the text</p>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+          <div>
+            <h3 style="margin: 0;">HSK Level Distribution (${state.hskStandard === 'new' ? 'HSK 3.0' : 'HSK 2.0'})</h3>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0.2rem 0 0 0;">Breakdown by ${state.distributionBasis === 'word' ? 'unique vocabulary words' : 'unique characters'}</p>
+          </div>
+          <div class="toggle-switch-group">
+            <button class="toggle-option ${state.distributionBasis === 'word' ? 'active' : ''}" data-basis="word" style="font-size: 0.75rem; padding: 0.2rem 0.55rem;">Words</button>
+            <button class="toggle-option ${state.distributionBasis === 'char' ? 'active' : ''}" data-basis="char" style="font-size: 0.75rem; padding: 0.2rem 0.55rem;">Characters</button>
+          </div>
+        </div>
         <div style="margin-top: 0.5rem;">
           ${[1, 2, 3, 4, 5, 6, 7].map(lvl => {
             const count = levelCounts[lvl] || 0;
-            const pct = uniqueCount > 0 ? Math.round((count / uniqueCount) * 100) : 0;
+            const pct = activeTotal > 0 ? Math.round((count / activeTotal) * 100) : 0;
             return `
               <div class="stat-bar-item">
                 <div class="stat-bar-header">
-                  <span><strong>Level ${lvl}</strong> (${count} chars)</span>
+                  <span><strong>Level ${lvl}</strong> (${count} ${activeLabel})</span>
                   <span>${pct}%</span>
                 </div>
                 <div class="progress-track">
@@ -908,11 +929,11 @@ function renderAnalyticsView() {
           }).join('')}
           <div class="stat-bar-item">
             <div class="stat-bar-header">
-              <span><strong>Non-HSK</strong> (${levelCounts[0] || 0} chars)</span>
-              <span>${uniqueCount > 0 ? Math.round(((levelCounts[0] || 0) / uniqueCount) * 100) : 0}%</span>
+              <span><strong>Non-HSK</strong> (${levelCounts[0] || 0} ${activeLabel})</span>
+              <span>${activeTotal > 0 ? Math.round(((levelCounts[0] || 0) / activeTotal) * 100) : 0}%</span>
             </div>
             <div class="progress-track">
-              <div class="progress-fill bg-hsk-none" style="width: ${uniqueCount > 0 ? Math.round(((levelCounts[0] || 0) / uniqueCount) * 100) : 0}%;"></div>
+              <div class="progress-fill bg-hsk-none" style="width: ${activeTotal > 0 ? Math.round(((levelCounts[0] || 0) / activeTotal) * 100) : 0}%;"></div>
             </div>
           </div>
         </div>
@@ -930,7 +951,7 @@ function renderAnalyticsView() {
             <strong>${uniqueCount}</strong>
           </div>
           <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 0.5rem;">
-            <span>Recognized Vocabulary Words:</span>
+            <span>Unique Vocabulary Words:</span>
             <strong>${wordCount}</strong>
           </div>
           <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 0.5rem;">
@@ -948,6 +969,15 @@ function renderAnalyticsView() {
       </div>
     </div>
   `;
+
+  // Bind basis toggles within analytics tab
+  container.querySelectorAll('[data-basis]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.distributionBasis = btn.getAttribute('data-basis');
+      renderSummaryBanner();
+      renderAnalyticsView();
+    });
+  });
 }
 
 // Render Summary Banner
@@ -956,36 +986,48 @@ function renderSummaryBanner() {
   const uniqueCount = state.uniqueChars.length;
   const wordCount = state.uniqueWords.length;
 
-  document.getElementById('metric-total-chars').textContent = totalChars;
-  document.getElementById('metric-unique-chars').textContent = uniqueCount;
-  document.getElementById('metric-total-words').textContent = wordCount;
+  const totalCharsEl = document.getElementById('metric-total-chars');
+  const uniqueCharsEl = document.getElementById('metric-unique-chars');
+  const totalWordsEl = document.getElementById('metric-total-words');
+  if (totalCharsEl) totalCharsEl.textContent = totalChars;
+  if (uniqueCharsEl) uniqueCharsEl.textContent = uniqueCount;
+  if (totalWordsEl) totalWordsEl.textContent = wordCount;
 
   // Level counts for progress bar
   const levelCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 0: 0 };
-  state.uniqueChars.forEach(c => {
-    const lvl = state.hskStandard === 'new' ? (c.newLevel || 0) : (c.oldLevel || 0);
+  const targetItems = state.distributionBasis === 'word' ? state.uniqueWords : state.uniqueChars;
+  const totalItemsCount = targetItems.length;
+
+  targetItems.forEach(item => {
+    const lvl = state.hskStandard === 'new' ? (item.newLevel || 0) : (item.oldLevel || 0);
     levelCounts[lvl] = (levelCounts[lvl] || 0) + 1;
   });
 
   const barContainer = document.getElementById('hsk-distribution-bar');
   if (barContainer) {
     barContainer.innerHTML = '';
-    if (uniqueCount === 0) {
+    if (totalItemsCount === 0) {
       barContainer.innerHTML = '<div class="hsk-bar-segment" style="width: 100%; background-color: var(--border-subtle);"></div>';
     } else {
+      const unitLabel = state.distributionBasis === 'word' ? 'words' : 'chars';
       [1, 2, 3, 4, 5, 6, 7, 0].forEach(lvl => {
         const count = levelCounts[lvl] || 0;
         if (count > 0) {
-          const pct = ((count / uniqueCount) * 100).toFixed(1);
+          const pct = ((count / totalItemsCount) * 100).toFixed(1);
           const seg = document.createElement('div');
           seg.className = `hsk-bar-segment bg-hsk-${lvl || 'none'}`;
           seg.style.width = `${pct}%`;
-          seg.title = `HSK ${lvl || 'None'}: ${count} chars (${pct}%)`;
+          seg.title = `HSK ${lvl || 'None'}: ${count} ${unitLabel} (${pct}%)`;
           barContainer.appendChild(seg);
         }
       });
     }
   }
+
+  // Update basis toggle buttons state
+  document.querySelectorAll('[data-basis]').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-basis') === state.distributionBasis);
+  });
 }
 
 // Render MCP Activity Logs
@@ -1054,7 +1096,16 @@ async function openInspector(queryWord, initialData = null) {
 
     // Populate Modal Fields
     if (firstHit) {
-      const primaryForm = firstHit.forms && firstHit.forms[0];
+      let primaryForm = firstHit.forms && firstHit.forms[0];
+      if (firstHit.forms && firstHit.forms.length > 1) {
+        if (initialData?.pinyin) {
+          const matched = firstHit.forms.find(f => f.pinyin === initialData.pinyin || f.pinyin_plain === initialData.pinyin);
+          if (matched) primaryForm = matched;
+        } else if (queryWord === '吗') {
+          const matched = firstHit.forms.find(f => f.pinyin === 'ma');
+          if (matched) primaryForm = matched;
+        }
+      }
       const trad = primaryForm?.traditional || queryWord;
       const pinyin = primaryForm?.pinyin || initialData?.pinyin || '';
       const meanings = primaryForm?.meanings ? primaryForm.meanings.join('; ') : (firstHit.meaning || 'No definition available');
@@ -1094,16 +1145,26 @@ async function openInspector(queryWord, initialData = null) {
       document.getElementById('modal-raw-json').textContent = JSON.stringify({ lookup: lookupRes, script: scriptRes, classifier: classifierRes }, null, 2);
     } else {
       // Fallback if not an official headword in HSK
-      const fallbackPinyin = initialData?.pinyin || window.HSK_CHARS[queryWord]?.p || '';
+      const fallbackPinyin = initialData?.pinyin || window.HSK_WORDS?.[queryWord]?.[0] || window.HSK_CHARS?.[queryWord]?.p || '';
+      const fallbackMeaning = initialData?.meaning || window.HSK_WORDS?.[queryWord]?.[3] || window.HSK_CHARS?.[queryWord]?.m || 'Vocabulary word evaluated in context.';
+      const fallbackNewLvl = initialData?.newLevel ?? window.HSK_WORDS?.[queryWord]?.[1] ?? window.HSK_CHARS?.[queryWord]?.n ?? 0;
+      const fallbackOldLvl = initialData?.oldLevel ?? window.HSK_WORDS?.[queryWord]?.[2] ?? window.HSK_CHARS?.[queryWord]?.o ?? 0;
+
+      document.getElementById('modal-char-traditional').textContent = '';
       document.getElementById('modal-char-pinyin').textContent = fallbackPinyin;
-      document.getElementById('modal-char-meaning').textContent = initialData?.meaning || 'Character not listed as an independent headword in HSK dataset.';
-      document.getElementById('modal-meta-levels').innerHTML = `<span class="hsk-pill bg-hsk-${initialData?.newLevel || 'none'}">HSK ${initialData?.newLevel || 'None'}</span>`;
-      document.getElementById('modal-meta-stats').textContent = 'Single Hanzi (Evaluated via contextual vocabulary)';
+      document.getElementById('modal-char-meaning').textContent = fallbackMeaning;
+      document.getElementById('modal-meta-levels').innerHTML = `
+        <span class="hsk-pill bg-hsk-${fallbackNewLvl || 'none'}">${fallbackNewLvl ? `HSK 3.0 Level ${fallbackNewLvl}` : 'Non-HSK'}</span>
+        <span class="hsk-pill bg-hsk-${fallbackOldLvl || 'none'}">${fallbackOldLvl ? `HSK 2.0 Level ${fallbackOldLvl}` : 'None'}</span>
+      `;
+      document.getElementById('modal-meta-stats').textContent = queryWord.length > 1 ? 'Compound Vocabulary Word' : 'Single Hanzi (Evaluated via contextual vocabulary)';
       document.getElementById('trans-pinyin').textContent = fallbackPinyin || '—';
       document.getElementById('trans-numeric').textContent = ToneUtils.toNumericPinyin(fallbackPinyin);
       document.getElementById('trans-bopomofo').textContent = '—';
       document.getElementById('trans-wadegiles').textContent = '—';
       document.getElementById('trans-romatzyh').textContent = '—';
+      const classEl = document.getElementById('modal-classifiers');
+      if (classEl) classEl.textContent = 'None listed';
       document.getElementById('modal-raw-json').textContent = JSON.stringify(lookupRes || {}, null, 2);
     }
   } catch (err) {
@@ -1279,6 +1340,15 @@ document.addEventListener('DOMContentLoaded', () => {
       renderVocabTableView();
       renderAnalyticsView();
       renderSummaryBanner();
+    });
+  });
+
+  // HSK Distribution Basis Toggle (Words vs Characters)
+  document.querySelectorAll('[data-basis]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.distributionBasis = btn.getAttribute('data-basis');
+      renderSummaryBanner();
+      renderAnalyticsView();
     });
   });
 

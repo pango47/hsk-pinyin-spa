@@ -122,12 +122,19 @@
         </div>
         <div class="metric-card">
           <span class="metric-val" id="metric-total-words">0</span>
-          <span class="metric-lbl">HSK Words</span>
+          <span class="metric-lbl">Unique Words</span>
         </div>
       </div>
 
       <!-- HSK Distribution Bar -->
       <div class="hsk-distribution-bar-wrapper">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.45rem; flex-wrap: wrap; gap: 0.5rem;">
+          <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">HSK Difficulty Breakdown:</span>
+          <div class="toggle-switch-group">
+            <button class="toggle-option active" data-basis="word" id="basis-btn-word" style="font-size: 0.75rem; padding: 0.2rem 0.55rem;">By Words</button>
+            <button class="toggle-option" data-basis="char" id="basis-btn-char" style="font-size: 0.75rem; padding: 0.2rem 0.55rem;">By Characters</button>
+          </div>
+        </div>
         <div class="hsk-distribution-bar" id="hsk-distribution-bar">
           <div class="hsk-bar-segment" style="width: 100%; background-color: var(--border-subtle);"></div>
         </div>
